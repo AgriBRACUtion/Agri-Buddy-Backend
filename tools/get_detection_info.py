@@ -1,3 +1,4 @@
+from gradio_client import Client, handle_file
 from langchain_core.tools import Tool
 from typing import List, Optional
 import logging
@@ -16,15 +17,13 @@ if not IMAGE_CLASSIFICATION_API:
 # API endpoint for the image classification model
 
 
-
-
 def classify_image(image_path: str) -> str:
     """
     Retrieves rice leaf disease name by sending the image to an external API.
-    
+
     Args:
         image_path (str): Path to the image file to classify.
-        
+
     Returns:
         str: Information about the detected rice leaf disease.
     """
@@ -32,27 +31,36 @@ def classify_image(image_path: str) -> str:
         error_msg = f"Image file not found at path: {image_path}"
         logger.error(error_msg)
         return error_msg
-    
+
     try:
         # Open the image file in binary mode
         with open(image_path, 'rb') as img_file:
             # Create a multipart form with the image file
-            files = {'file': (os.path.basename(image_path), img_file, 'image/jpeg')}
-            
+            files = {'file': (os.path.basename(image_path),
+                              img_file, 'image/jpeg')}
+
             # Send the POST request to the API
             logger.info(f"Sending image to API: {IMAGE_CLASSIFICATION_API}")
-            response = requests.post(IMAGE_CLASSIFICATION_API, files=files)
-            
+            # response = requests.post(IMAGE_CLASSIFICATION_API, files=files)
+            client = Client("Rezuwan/vgg16")
+
+            response = client.predict(
+                image=handle_file(image_path),
+                api_name="/predict"
+            )
+            # print(result['label'])
+
             # Check if the request was successful
-            if response.status_code == 200:
+            print(response)
+            if response:
                 # Parse the JSON response
-                result = response.json()
+                result = response['label']
                 logger.info(f"Received response: {result}")
-                
+
                 # Format the response
                 if isinstance(result, dict):
                     disease_name = result
-                    
+
                     formatted_response = f"""
 Disease Detected: {disease_name}
 This disease was detected from analyzing the image you provided.
@@ -64,7 +72,7 @@ This disease was detected from analyzing the image you provided.
                 error_msg = f"API request failed with status code: {response.status_code}"
                 logger.error(error_msg)
                 return error_msg
-                
+
     except Exception as e:
         error_msg = f"Error while processing image classification: {str(e)}"
         logger.error(error_msg)
@@ -78,3 +86,13 @@ disease_detection_tool = Tool(
     description="Analyzes images of rice plants to detect diseases and provide treatment recommendations. Use this tool when the user uploads an image of a rice plant or asks about identifying plant diseases from images.",
 
 )
+
+
+# client = Client("Rezuwan/vgg16")
+# result = client.predict(
+#     image=handle_file(
+#         'https://raw.githubusercontent.com/gradio-app/gradio/main/test/test_files/bus.png'),
+#     api_name="/predict"
+# )
+# # Print only the first label from the result
+# print(result['label'])
