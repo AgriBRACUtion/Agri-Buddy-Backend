@@ -9,6 +9,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.graph import START, END, StateGraph
 from tools.search_paddy_info import paddy_info_tool, search_rice_varieties
 from tools.weather import weather_info_tool
+from tools.search_tool import search
 from tools.get_detection_info import disease_detection_tool
 from tools.search_disease_treatment import disease_treatment_tool
 from core.prompt import SYSTEM
@@ -94,7 +95,8 @@ tools = [
     paddy_info_tool, 
     disease_detection_tool, 
     disease_treatment_tool, 
-    weather_info_tool
+    weather_info_tool,
+    search
     ]
 
 # Bind tools to the LLM
