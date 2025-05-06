@@ -6,51 +6,25 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .  
     steps:
     - name: Checkout Source
       uses: actions/checkout@v4
       
     - name: Create Procfile
-      run: |
-        echo "web: gunicorn app:app" > Procfile
-        echo "Created Procfile for Elastic Beanstalk"
-        
-    - name: Add gunicorn to requirements
-      run: |
-        echo "gunicorn==21.2.0" >> requirements.txt
-        echo "Added gunicorn to requirements.txt"
-        
-    - name: Create .ebextensions directory
-      run: mkdir -p .ebextensions
+      run: echo "web: gunicorn --bind=0.0.0.0:5000 app:app" > Procfile
       
-    - name: Create Python configuration
+    - name: Update requirements.txt
       run: |
-        cat > .ebextensions/python.config << EOL
-        option_settings:
-          aws:elasticbeanstalk:container:python:
-            WSGIPath: app:app
-          aws:elasticbeanstalk:application:environment:
-            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-            DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
-            FLASK_APP: app.py
-            FLASK_DEBUG: 0
-            PYTHONUNBUFFERED: 1
-        EOL
-        
-    - name: Create environment configuration
+        if ! grep -q "gunicorn" requirements.txt; then
+          echo "gunicorn" >> requirements.txt
+        fi
+      
+    - name: Create necessary EB config files
       run: |
-        cat > .ebextensions/environment.config << EOL
-        option_settings:
-          aws:elasticbeanstalk:application:environment:
-            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-            DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
-            FLASK_APP: app.py
-            FLASK_DEBUG: 0
-            PYTHONUNBUFFERED: 1
-        EOL
+        mkdir -p .platform/hooks/predeploy
+        echo "#!/bin/bash" > .platform/hooks/predeploy/01_setup.sh
+        echo "pip install -r requirements.txt" >> .platform/hooks/predeploy/01_setup.sh
+        chmod +x .platform/hooks/predeploy/01_setup.sh
         
     - name: Generate deployment package
       run: zip -r deploy.zip . -x "*.git*"
@@ -58,7 +32,7 @@ jobs:
     - name: Deploy to EB
       uses: einaregilsson/beanstalk-deploy@v21
       with:
-        aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+        aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         application_name: agribuddy-backend
         environment_name: Agribuddy-backend-env
