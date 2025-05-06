@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  agri-buddy:
+    build: .
+    container_name: agri-buddy-backend
+    restart: always
+    ports:
+      - "3000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./database:/app/database
+    environment:
+      - OPENAI_API_KEY=your_openai_api_key
+      - DISEASE_DETECTION_API_ENDPOINT=your_disease_detection_api_endpoint
+    networks:
+      - agri-buddy-network
+
+networks:
+  agri-buddy-network:
+    driver: bridge
