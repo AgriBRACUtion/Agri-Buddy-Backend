@@ -12,14 +12,34 @@ jobs:
     steps:
     - name: Checkout Source
       uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    - name: Install Dependencies
-      run: pip install -r requirements.txt
+      
+    - name: Create Procfile
+      run: |
+        echo "web: gunicorn app:app" > Procfile
+        echo "Created Procfile for Elastic Beanstalk"
+        
+    - name: Add gunicorn to requirements
+      run: |
+        echo "gunicorn==21.2.0" >> requirements.txt
+        echo "Added gunicorn to requirements.txt"
+        
     - name: Create .ebextensions directory
       run: mkdir -p .ebextensions
+      
+    - name: Create Python configuration
+      run: |
+        cat > .ebextensions/python.config << EOL
+        option_settings:
+          aws:elasticbeanstalk:container:python:
+            WSGIPath: app:app
+          aws:elasticbeanstalk:application:environment:
+            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
+            FLASK_APP: app.py
+            FLASK_DEBUG: 0
+            PYTHONUNBUFFERED: 1
+        EOL
+        
     - name: Create environment configuration
       run: |
         cat > .ebextensions/environment.config << EOL
@@ -31,8 +51,10 @@ jobs:
             FLASK_DEBUG: 0
             PYTHONUNBUFFERED: 1
         EOL
+        
     - name: Generate deployment package
       run: zip -r deploy.zip . -x "*.git*"
+      
     - name: Deploy to EB
       uses: einaregilsson/beanstalk-deploy@v21
       with:
