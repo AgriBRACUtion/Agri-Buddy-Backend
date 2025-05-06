@@ -61,7 +61,7 @@ jobs:
         aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
         aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         application_name: agribuddy-backend
-        environment_name: Agribuddy-backend-env
+        environment_name: agribuddy-backend-env
         region: eu-north-1
         version_label: ${{ github.sha }}
         deployment_package: deploy.zip
