@@ -16,14 +16,21 @@ jobs:
     - name: Create .ebextensions directory
       run: mkdir -p .ebextensions
       
-    - name: Create packages config
+    - name: Create C++ compiler config
       run: |
         cat > .ebextensions/01_packages.config << EOL
         packages:
           yum:
+            gcc: []
             gcc-c++: []
             python3-devel: []
             cmake: []
+            
+        commands:
+          01_install_cpp11:
+            command: |
+              yum groupinstall -y "Development Tools"
+              yum install -y cmake3
         EOL
       
     - name: Create Python configuration
@@ -35,12 +42,14 @@ jobs:
           aws:elasticbeanstalk:application:environment:
             OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
             DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
-        
-        commands:
+            PYTHONPATH: "/var/app/current"
+            LD_LIBRARY_PATH: "/usr/local/lib64:/usr/local/lib"
+            
+        container_commands:
           01_upgrade_pip:
-            command: "pip install --upgrade pip"
+            command: "pip install --upgrade pip setuptools wheel"
           02_install_requirements:
-            command: "pip install -r requirements.txt"
+            command: "pip install --no-cache-dir -r requirements.txt"
         EOL
       
     - name: Generate deployment package
