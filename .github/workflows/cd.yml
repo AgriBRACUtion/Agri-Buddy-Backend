@@ -11,21 +11,38 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Create Procfile
-      run: 'echo "web: gunicorn --bind=0.0.0.0:5000 app:app" > Procfile'
+      run: 'echo "web: gunicorn app:app" > Procfile'
       
-    - name: Update requirements.txt
-      run: |
-        if ! grep -q "gunicorn" requirements.txt; then
-          echo "gunicorn" >> requirements.txt
-        fi
+    - name: Create .ebextensions directory
+      run: mkdir -p .ebextensions
       
-    - name: Create necessary EB config files
+    - name: Create packages config
       run: |
-        mkdir -p .platform/hooks/predeploy
-        echo "#!/bin/bash" > .platform/hooks/predeploy/01_setup.sh
-        echo "pip install -r requirements.txt" >> .platform/hooks/predeploy/01_setup.sh
-        chmod +x .platform/hooks/predeploy/01_setup.sh
+        cat > .ebextensions/01_packages.config << EOL
+        packages:
+          yum:
+            gcc-c++: []
+            python3-devel: []
+            cmake: []
+        EOL
+      
+    - name: Create Python configuration
+      run: |
+        cat > .ebextensions/02_python.config << EOL
+        option_settings:
+          aws:elasticbeanstalk:container:python:
+            WSGIPath: app:app
+          aws:elasticbeanstalk:application:environment:
+            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
         
+        commands:
+          01_upgrade_pip:
+            command: "pip install --upgrade pip"
+          02_install_requirements:
+            command: "pip install -r requirements.txt"
+        EOL
+      
     - name: Generate deployment package
       run: zip -r deploy.zip . -x "*.git*"
       
