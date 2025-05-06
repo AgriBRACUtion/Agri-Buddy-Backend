@@ -41,20 +41,20 @@ def classify_image(image_path: str) -> str:
 
             # Send the POST request to the API
             logger.info(f"Sending image to API: {IMAGE_CLASSIFICATION_API}")
-            # response = requests.post(IMAGE_CLASSIFICATION_API, files=files)
-            client = Client("Rezuwan/vgg16")
+            response = requests.post(IMAGE_CLASSIFICATION_API, files=files)
+            # client = Client("Rezuwan/vgg16")
 
-            response = client.predict(
-                image=handle_file(image_path),
-                api_name="/predict"
-            )
+            # response = client.predict(
+            #     image=handle_file(image_path),
+            #     api_name="/predict"
+            # )
             # print(result['label'])
 
             # Check if the request was successful
             print(response)
-            if response:
+            if response.status_code == 200:
                 # Parse the JSON response
-                result = response['label']
+                result = response.json()
                 logger.info(f"Received response: {result}")
 
                 # Format the response

@@ -88,8 +88,12 @@ document_chain_prompt = ChatPromptTemplate.from_messages(
 question_answering_chain = create_stuff_documents_chain(
     llm, document_chain_prompt)
 
-# Tools - now including image classification
-tools = [paddy_info_tool, disease_detection_tool, disease_treatment_tool]
+# Tools
+tools = [
+    paddy_info_tool, 
+    disease_detection_tool, 
+    disease_treatment_tool, 
+    ]
 
 # Bind tools to the LLM
 llm_with_tools = llm.bind_tools(tools)
