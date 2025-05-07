@@ -11,8 +11,9 @@ services:
       - ./uploads:/app/uploads
       - ./database:/app/database
     environment:
-      - OPENAI_API_KEY=your_openai_api_key
-      - DISEASE_DETECTION_API_ENDPOINT=your_disease_detection_api_endpoint
+      - OPENAI_API_KEY=your_api_key
+      - DISEASE_DETECTION_API_ENDPOINT=https://your_api_key/
+      - WEATHER_API_KEY=your_api_key
     networks:
       - agri-buddy-network
 
