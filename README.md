@@ -7,6 +7,7 @@ This document explains how to run the Agri-Buddy backend using Docker.
 
 - [Docker](https://docs.docker.com/get-docker/)
   
+
   
 - [Docker Compose](https://docs.docker.com/compose/install/)
 
