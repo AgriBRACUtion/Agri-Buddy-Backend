@@ -1,63 +1,97 @@
-name: Deploy to AWS Elastic Beanstalk
+name: Deploy to AWS Elastic Beanstalk with Docker
+
 on:
   push:
     branches:
       - main
+
 jobs:
-  deploy:
+  build_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Source
+      - name: Checkout source code
         uses: actions/checkout@v4
-      - name: Create Procfile
-        run: 'echo "web: gunicorn app:app" > Procfile'
-      - name: Create .ebextensions directory
-        run: mkdir -p .ebextensions
-      - name: Create C++ compiler config
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: agribuddy-backend
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          cat > .ebextensions/01_packages.config <<EOL
-          packages:
-            yum:
-              gcc: []
-              gcc-c++: []
-              python3-devel: []
-              cmake: []
-          commands:
-            01_install_cpp11:
-              command: |
-                yum groupinstall -y "Development Tools"
-                yum install -y cmake3
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create Dockerrun.aws.json
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: agribuddy-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cat > Dockerrun.aws.json <<EOL
+          {
+            "AWSEBDockerrunVersion": "1",
+            "Image": {
+              "Name": "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG",
+              "Update": "true"
+            },
+            "Ports": [
+              {
+                "ContainerPort": "5000",
+                "HostPort": "80"
+              }
+            ],
+            "Volumes": [
+              {
+                "HostDirectory": "/var/app/current/uploads",
+                "ContainerDirectory": "/app/uploads"
+              },
+              {
+                "HostDirectory": "/var/app/current/database",
+                "ContainerDirectory": "/app/database"
+              }
+            ],
+            "Logging": "/var/log/nginx"
+          }
           EOL
-      - name: Create Python configuration
+
+      - name: Create .ebextensions for environment variables
         run: |
-          cat > .ebextensions/02_python.config <<EOL
+          mkdir -p .ebextensions
+          cat > .ebextensions/env-variables.config <<EOL
           option_settings:
-            aws:elasticbeanstalk:container:python:
-              WSGIPath: app:app
             aws:elasticbeanstalk:application:environment:
-              OPENAI_API_KEY: \${OPENAI_API_KEY}
-              DISEASE_DETECTION_API_ENDPOINT: \${DISEASE_DETECTION_API_ENDPOINT}
-              PYTHONPATH: "/var/app/current"
-              LD_LIBRARY_PATH: "/usr/local/lib64:/usr/local/lib"
-          container_commands:
-            01_upgrade_pip:
-              command: "pip install --upgrade pip setuptools wheel"
-            02_install_requirements:
-              command: "pip install --no-cache-dir -r requirements.txt"
+              OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+              DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
+              WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
           EOL
-      - name: Replace placeholders with GitHub secrets
-        run: |
-          sed -i "s|\${OPENAI_API_KEY}|${{ secrets.OPENAI_API_KEY }}|g" .ebextensions/02_python.config
-          sed -i "s|\${DISEASE_DETECTION_API_ENDPOINT}|${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}|g" .ebextensions/02_python.config
+
       - name: Generate deployment package
-        run: zip -r deploy.zip . -x "*.git*"
+        run: zip -r deploy.zip Dockerrun.aws.json .ebextensions
+
       - name: Deploy to EB
         uses: einaregilsson/beanstalk-deploy@v21
         with:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
-          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           application_name: agribuddy-backend
           environment_name: Agribuddy-backend-env
           region: eu-north-1
-          version_label: ${{ github.sha }}
+          version_label: docker-${{ github.sha }}
           deployment_package: deploy.zip
