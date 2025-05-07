@@ -1,68 +1,63 @@
 name: Deploy to AWS Elastic Beanstalk
- on:
-   push:
-     branches:
-       - main
- jobs:
-   deploy:
-     runs-on: ubuntu-latest
-     steps:
-     - name: Checkout Source
-       uses: actions/checkout@v4
- 
-     - name: Create Procfile
-       run: 'echo "web: gunicorn app:app" > Procfile'
- 
-     - name: Create .ebextensions directory
-       run: mkdir -p .ebextensions
- 
-     - name: Create C++ compiler config
-       run: |
-         cat > .ebextensions/01_packages.config << EOL
-         packages:
-           yum:
-             gcc: []
-             gcc-c++: []
-             python3-devel: []
-             cmake: []
-             
-         commands:
-           01_install_cpp11:
-             command: |
-               yum groupinstall -y "Development Tools"
-               yum install -y cmake3
-         EOL
-       
-     - name: Create Python configuration
-       run: |
-         cat > .ebextensions/02_python.config << EOL
-         option_settings:
-           aws:elasticbeanstalk:container:python:
-             WSGIPath: app:app
-           aws:elasticbeanstalk:application:environment:
-             OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-             DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
-             PYTHONPATH: "/var/app/current"
-             LD_LIBRARY_PATH: "/usr/local/lib64:/usr/local/lib"
-             
-         container_commands:
-           01_upgrade_pip:
-             command: "pip install --upgrade pip setuptools wheel"
-           02_install_requirements:
-             command: "pip install --no-cache-dir -r requirements.txt"
-         EOL
-       
-     - name: Generate deployment package
-       run: zip -r deploy.zip . -x "*.git*"
- 
-     - name: Deploy to EB
-       uses: einaregilsson/beanstalk-deploy@v21
-       with:
-         aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
-         aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-         application_name: agribuddy-backend
-         environment_name: agribuddy-backend-env
-         environment_name: Agribuddy-backend-env
-         region: eu-north-1
-         version_label: ${{ github.sha }}
-         deployment_package: deploy.zip
+on:
+  push:
+    branches:
+      - main
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+      - name: Create Procfile
+        run: 'echo "web: gunicorn app:app" > Procfile'
+      - name: Create .ebextensions directory
+        run: mkdir -p .ebextensions
+      - name: Create C++ compiler config
+        run: |
+          cat > .ebextensions/01_packages.config <<EOL
+          packages:
+            yum:
+              gcc: []
+              gcc-c++: []
+              python3-devel: []
+              cmake: []
+          commands:
+            01_install_cpp11:
+              command: |
+                yum groupinstall -y "Development Tools"
+                yum install -y cmake3
+          EOL
+      - name: Create Python configuration
+        run: |
+          cat > .ebextensions/02_python.config <<EOL
+          option_settings:
+            aws:elasticbeanstalk:container:python:
+              WSGIPath: app:app
+            aws:elasticbeanstalk:application:environment:
+              OPENAI_API_KEY: \${OPENAI_API_KEY}
+              DISEASE_DETECTION_API_ENDPOINT: \${DISEASE_DETECTION_API_ENDPOINT}
+              PYTHONPATH: "/var/app/current"
+              LD_LIBRARY_PATH: "/usr/local/lib64:/usr/local/lib"
+          container_commands:
+            01_upgrade_pip:
+              command: "pip install --upgrade pip setuptools wheel"
+            02_install_requirements:
+              command: "pip install --no-cache-dir -r requirements.txt"
+          EOL
+      - name: Replace placeholders with GitHub secrets
+        run: |
+          sed -i "s|\${OPENAI_API_KEY}|${{ secrets.OPENAI_API_KEY }}|g" .ebextensions/02_python.config
+          sed -i "s|\${DISEASE_DETECTION_API_ENDPOINT}|${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}|g" .ebextensions/02_python.config
+      - name: Generate deployment package
+        run: zip -r deploy.zip . -x "*.git*"
+      - name: Deploy to EB
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: agribuddy-backend
+          environment_name: Agribuddy-backend-env
+          region: eu-north-1
+          version_label: ${{ github.sha }}
+          deployment_package: deploy.zip
