@@ -71,6 +71,7 @@ jobs:
             aws:elasticbeanstalk:application:environment:
               OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
               DISEASE_DETECTION_API_ENDPOINT: ${{ secrets.DISEASE_DETECTION_API_ENDPOINT }}
+              WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
               
           EOL
       - name: Generate deployment package
